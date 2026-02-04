@@ -8,6 +8,7 @@ from secure_reconcile import ReconciliationEngine
 
 app = Flask(__name__)
 app.secret_key = "super_secure_secret_key"
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
@@ -70,7 +71,7 @@ def add_product():
         flash("All fields required")
         return redirect(url_for("index"))
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -98,4 +99,4 @@ def add_product():
     return redirect(url_for("index"))
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run()
