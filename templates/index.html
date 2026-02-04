@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Reconciliation | Enterprise</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700&display=swap"
+        rel="stylesheet">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>SecureReconcile</h1>
+            <p class="subtitle">Securely match and enrich your data against master records.</p>
+            <button id="add-product-btn" class="secondary-button" onclick="openModal()">+ Add New Product</button>
+        </header>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div id="alerts">
+            {% for message in messages %}
+            <div class="{{ 'alert alert-error' if 'Error' in message else 'alert alert-success' }}">
+                <span>{{ '⚠️' if 'Error' in message else '✅' }}</span>
+                <span>{{ message }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <form action="/upload" method="post" enctype="multipart/form-data" id="upload-form">
+            <div class="upload-area" id="drop-zone">
+                <input type="file" name="file" id="file-input" accept=".xlsx,.xls,.csv">
+
+                <div class="icon-container">
+                    <span>📂</span>
+                </div>
+                <div class="upload-text-main">
+                    Click to upload or drag & drop
+                </div>
+                <div class="upload-text-sub">
+                    Supports Excel (.xlsx) and CSV files
+                </div>
+            </div>
+
+            <div id="file-info">
+                <div class="file-icon">📄</div>
+                <div id="file-name">No file selected</div>
+            </div>
+
+            <button type="submit" class="cta-button" id="submit-btn" disabled>
+                Process & Download
+            </button>
+        </form>
+    </div>
+
+    <!-- Add Product Modal -->
+    <div id="product-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h2>Add New Product</h2>
+            <form action="/add_product" method="post">
+                <div class="form-group">
+                    <label for="product_code">Product Code</label>
+                    <input type="text" id="product_code" name="product_code" placeholder="e.g. 9999" required>
+                </div>
+                <div class="form-group">
+                    <label for="category">Category (Description)</label>
+                    <input type="text" id="category" name="category" placeholder="e.g. Special Item" required>
+                </div>
+                <div class="form-group-row">
+                    <div class="form-group">
+                        <label for="price">Price</label>
+                        <input type="number" step="0.01" id="price" name="price" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="quantity">Quantity</label>
+                        <input type="number" id="quantity" name="quantity" placeholder="0" required>
+                    </div>
+                </div>
+                <button type="submit" class="cta-button"
+                    style="opacity: 1; pointer-events: auto; margin-top: 1rem;">Save to Database</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const modal = document.getElementById('product-modal');
+
+        function openModal() {
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+
+        window.onclick = function (event) {
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInfo = document.getElementById('file-info');
+        const fileNameDisplay = document.getElementById('file-name');
+        const submitBtn = document.getElementById('submit-btn');
+        const form = document.getElementById('upload-form');
+
+        // Drag & Drop Visuals
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                fileInput.files = files;
+                updateUI(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (fileInput.files.length) {
+                updateUI(fileInput.files[0]);
+            }
+        });
+
+        function updateUI(file) {
+            fileNameDisplay.textContent = file.name;
+            fileInfo.style.display = 'flex';
+            submitBtn.disabled = false;
+        }
+
+        form.addEventListener('submit', (e) => {
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = "";
+
+            // Create spinner
+            const spinner = document.createElement('span');
+            spinner.className = 'spinner';
+            submitBtn.appendChild(spinner);
+            submitBtn.appendChild(document.createTextNode('Processing...'));
+
+            submitBtn.style.opacity = '0.7';
+
+            // Re-enable after delay (download simulation)
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.style.opacity = '1';
+                // We keep it enabled so they can submit again if they want
+            }, 8000);
+        });
+    </script>
+</body>
+
+</html>

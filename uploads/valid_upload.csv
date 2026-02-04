@@ -1,0 +1,8 @@
+product_code,store_id,store_name,category,quantity,price,currency,upload_batch
+1001,S01,Central Store,Electronics,5,1150.0,INR,BATCH_001
+1002,S01,Central Store,Electronics,10,,INR,BATCH_001
+9999,S02,West Store,Grocery,1,,INR,BATCH_001
+8888,S03,North Store,Furniture,5,100,INR,BATCH_001
+1001,S02,West Store,Electronics,2,,INR,BATCH_002
+1003,S01,Central Store,Grocery,20,45.5,INR,BATCH_002
+7777,S04,South Store,Electronics,3,999.99,INR,BATCH_002
