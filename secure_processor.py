@@ -33,7 +33,29 @@ def load_price_db():
     if not os.path.exists(PRICE_DB_FILE):
         print("Error: Price database not found.")
         return None
-    return pd.read_csv(PRICE_DB_FILE)
+    df = pd.read_csv(PRICE_DB_FILE)
+    
+    # map normalized col name -> actual col name
+    col_map = {c.lower().strip(): c for c in df.columns}
+    
+    # Check for new schema: 'model' & 'price'
+    if 'model' in col_map and 'price' in col_map:
+        df['Product_ID'] = df[col_map['model']]
+        df['Product_Name'] = df[col_map['model']]
+        df['Unit_Price'] = df[col_map['price']]
+        return df
+        
+    # Check for legacy schema and enforce TitleCase for compatibility
+    # Expected: Product_ID, Product_Name, Unit_Price
+    rename_map = {}
+    if 'product_id' in col_map: rename_map[col_map['product_id']] = 'Product_ID'
+    if 'product_name' in col_map: rename_map[col_map['product_name']] = 'Product_Name'
+    if 'unit_price' in col_map: rename_map[col_map['unit_price']] = 'Unit_Price'
+    
+    if rename_map:
+        df.rename(columns=rename_map, inplace=True)
+        
+    return df
 
 def save_price_db(df):
     df.to_csv(PRICE_DB_FILE, index=False)
@@ -112,7 +134,7 @@ def admin_flow():
 
 def add_product():
     try:
-        p_id = int(input("Enter Product ID: "))
+        p_id = input("Enter Product ID (Model): ").strip()
         p_name = input("Enter Product Name: ").strip()
         p_price = float(input("Enter Unit Price: "))
         
@@ -122,9 +144,14 @@ def add_product():
                 print("Error: Product ID already exists.")
                 return
 
-            new_row = pd.DataFrame({'Product_ID': [p_id], 'Product_Name': [p_name], 'Unit_Price': [p_price]})
-            df = pd.concat([df, new_row], ignore_index=True)
-            save_price_db(df)
+            # Append to ACTUAL CSV (model, price)
+            # We don't use save_price_db generic function here because we want to write specific format
+            new_row_list = [p_id, p_price]
+            with open(PRICE_DB_FILE, 'a', newline='') as f:
+                 import csv
+                 writer = csv.writer(f)
+                 writer.writerow(new_row_list)
+
             log_action("ADD_PRODUCT", f"ID={p_id}, Name={p_name}, Price={p_price}")
             print("Product added successfully.")
             
@@ -133,7 +160,7 @@ def add_product():
 
 def update_product():
     try:
-        p_id = int(input("Enter Product ID to update: "))
+        p_id = input("Enter Product ID to update: ").strip()
         df = load_price_db()
         
         if df is not None:
@@ -142,8 +169,17 @@ def update_product():
                 return
             
             new_price = float(input("Enter new Unit Price: "))
-            df.loc[df['Product_ID'] == p_id, 'Unit_Price'] = new_price
-            save_price_db(df)
+            
+            # Update CSV file directly because pandas round-trip might mess up schema if we rely on load_price_db adapter
+            # Simple approach: Read all, update, write all (using new schema)
+            
+            original_df = pd.read_csv(PRICE_DB_FILE)
+            original_df.columns = [c.lower().strip() for c in original_df.columns]
+            
+            if 'model' in original_df.columns:
+                 original_df.loc[original_df['model'] == p_id, 'price'] = new_price
+                 original_df.to_csv(PRICE_DB_FILE, index=False)
+            
             log_action("UPDATE_PRICE", f"ID={p_id}, NewPrice={new_price}")
             print("Price updated successfully.")
 
@@ -152,7 +188,7 @@ def update_product():
 
 def delete_product():
     try:
-        p_id = int(input("Enter Product ID to delete: "))
+        p_id = input("Enter Product ID to delete: ").strip()
         df = load_price_db()
         
         if df is not None:
@@ -163,8 +199,13 @@ def delete_product():
             # Security Check
             password = getpass.getpass("Enter Admin Password to confirm deletion: ")
             if password == ADMIN_PASSWORD:
-                df = df[df['Product_ID'] != p_id]
-                save_price_db(df)
+                # Delete from actual CSV
+                original_df = pd.read_csv(PRICE_DB_FILE)
+                original_df.columns = [c.lower().strip() for c in original_df.columns]
+                if 'model' in original_df.columns:
+                    original_df = original_df[original_df['model'] != p_id]
+                    original_df.to_csv(PRICE_DB_FILE, index=False)
+                
                 log_action("DELETE_PRODUCT", f"ID={p_id}", success=True)
                 print("Product deleted successfully.")
             else:

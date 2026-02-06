@@ -90,6 +90,7 @@ class ReconciliationEngine:
         # Mapping aliases
         col_map = {
             'product_id': 'product_code',
+            'model': 'product_code',
             'unit_price': 'price',
             'qty': 'quantity'
         }

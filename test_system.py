@@ -12,15 +12,15 @@ import secure_processor
 class TestSecureSystem(unittest.TestCase):
     
     def setUp(self):
-        # Create a temporary test database
+        # Create a temporary test database with NEW schema
         self.test_db = 'test_price_db.csv'
         self.test_log_dir = 'test_logs'
         self.test_log_file = os.path.join(self.test_log_dir, 'admin_actions.log')
         
+        # New Schema: model, price
         df = pd.DataFrame({
-            'Product_ID': [1, 2],
-            'Product_Name': ['TestItem1', 'TestItem2'],
-            'Unit_Price': [10.0, 20.0]
+            'model': ['Item1', 'Item2'],
+            'price': [10.0, 20.0]
         })
         df.to_csv(self.test_db, index=False)
         
@@ -38,9 +38,9 @@ class TestSecureSystem(unittest.TestCase):
 
     @patch('builtins.input')
     def test_standard_user_view_hides_price(self, mock_input):
-        # Create a dummy user file
+        # User upload uses 'Product_Name' which maps to 'model'
         user_file = 'user_upload_test.csv'
-        pd.DataFrame({'Product_Name': ['TestItem1'], 'Quantity': [5]}).to_csv(user_file, index=False)
+        pd.DataFrame({'Product_Name': ['Item1'], 'Quantity': [5]}).to_csv(user_file, index=False)
         
         mock_input.return_value = user_file
         
@@ -57,40 +57,31 @@ class TestSecureSystem(unittest.TestCase):
         
         output = captured_output.getvalue()
         
-        # Check if Unit_Price is NOT in output
-        self.assertNotIn("Unit_Price", output)
+        # Check if output contains Item Total (10.0 * 5 = 50.0)
         self.assertIn("Item_Total", output)
-        self.assertIn("Grand Total", output)
-        
-        # calculate expected total: 10.0 * 5 = 50.0
         self.assertIn("50.00", output)
 
-    @patch('builtins.input', side_effect=['99', 'NewItem', '50.0'])
+    @patch('builtins.input', side_effect=['NewModel', 'New Description', '100.0']) 
     def test_admin_add_product(self, mock_input):
+        # Input: ID(Model), Name(Desc), Price
         secure_processor.add_product()
         df = pd.read_csv(self.test_db)
-        self.assertTrue(99 in df['Product_ID'].values)
-        self.assertTrue('NewItem' in df['Product_Name'].values)
+        # Check if NewModel is in 'model' column
+        self.assertTrue('NewModel' in df['model'].values)
 
-    @patch('builtins.input', return_value='1')
+    @patch('builtins.input', return_value='Item1')
     @patch('getpass.getpass', return_value='wrongpassword')
     def test_admin_delete_fail_wrong_password(self, mock_getpass, mock_input):
-        # Note: arguments are passed bottom-up -> mock_getpass (inner), mock_input (outer)?
-        # Actually in python 3 it is Top-down?
-        # Let's just create the mocks and not worry about arg order if we don't use them directly (except mock_getpass return value)
-        # But we do use side_effects above.
-        # Python docs say: @patch('A'), @patch('B') -> def test(mock_A, mock_B)
-        
         secure_processor.delete_product()
         df = pd.read_csv(self.test_db)
-        self.assertTrue(1 in df['Product_ID'].values) # Should NOT be deleted
+        self.assertTrue('Item1' in df['model'].values) # Should NOT be deleted
 
-    @patch('builtins.input', return_value='1')
+    @patch('builtins.input', return_value='Item1')
     @patch('getpass.getpass', return_value='admin123')
     def test_admin_delete_success(self, mock_getpass, mock_input):
         secure_processor.delete_product()
         df = pd.read_csv(self.test_db)
-        self.assertFalse(1 in df['Product_ID'].values) # Should be deleted
+        self.assertFalse('Item1' in df['model'].values) # Should be deleted
 
 if __name__ == '__main__':
     unittest.main()

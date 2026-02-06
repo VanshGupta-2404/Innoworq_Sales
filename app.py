@@ -89,21 +89,15 @@ def add_product():
         # Check if file exists to determine if we need header (though it should exist)
         file_exists = os.path.exists(csv_file)
         
-        # Schema: product_code,store_id,store_name,category,quantity,price,currency,upload_batch
+        # New Schema: model,price
         new_row = [
             p_code,
-            "MANUAL",
-            "Manual Entry",
-            category,
-            quantity,
-            price,
-            "INR",
-            "MANUAL_ADD"
+            price
         ]
         
         with open(csv_file, 'a', newline='') as f:
             writer = import_csv.writer(f)
-            # if not file_exists: writer.writerow(...) # Assuming existing file
+            # if not file_exists: writer.writerow(['model', 'price']) # Assuming existing file
             writer.writerow(new_row)
             
         # 2. Update SQLite
