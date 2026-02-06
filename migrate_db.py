@@ -42,61 +42,57 @@ def init_db():
     
     conn.commit()
     conn.close()
-    print(f"Database {DB_FILE} initialized.")
-
 def migrate_csv():
     if not os.path.exists(CSV_FILE):
         print(f"Error: {CSV_FILE} not found.")
         return
 
-    df = pd.read_csv(CSV_FILE)
-    
-    # Rename columns to match new schema if necessary
-    # Expected CSV cols: model, price
-    # New Schema cols: product_code, description, price
-    
-    # Map CSV columns to Schema columns
-    df_db = pd.DataFrame()
+    df = pd.read_csv(
+        CSV_FILE,
+        engine="python",
+        on_bad_lines="skip"
+    )
 
-    # Handle various casing or whitespace in headers just in case
+    # Normalize headers
     df.columns = [c.lower().strip() for c in df.columns]
+
+    df_db = pd.DataFrame()
 
     if 'model' in df.columns:
         df_db['product_code'] = df['model'].astype(str).str.strip()
-        # Use Model as description since we don't have a separate category anymore
-        df_db['description'] = df['model'].astype(str).str.strip() 
-    elif 'product_code' in df.columns: # Fallback support
+        df_db['description'] = df_db['product_code']
+    elif 'product_code' in df.columns:
         df_db['product_code'] = df['product_code'].astype(str).str.strip()
-        df_db['description'] = df.get('category', df_db['product_code']) # Fallback to code if category missing
+        df_db['description'] = df_db['product_code']
     else:
-        print(f"Error: Could not find 'model' or 'product_code' in CSV columns: {df.columns}")
+        print(f"Error: No model/product_code column found: {df.columns}")
         return
 
-    if 'price' in df.columns:
-        df_db['price'] = df['price'].fillna(0.0)
-    else:
-        print("Error: 'price' column missing.")
+    if 'price' not in df.columns:
+        print("Error: price column missing.")
         return
-    
-    # Default Quantity to 0 as it's not in the new simple CSV
-    if 'quantity' in df.columns:
-        df_db['quantity'] = df['quantity'].fillna(0).astype(int)
-    else:
-        df_db['quantity'] = 0
-    
-    # Deduplicate by product_code (keep last)
-    df_db = df_db.drop_duplicates(subset=['product_code'], keep='last')
-    
-    df_db['final_amount'] = 0.0 # Default initialization
+
+    # Clean price (remove commas, text → numeric)
+    df_db['price'] = (
+        df['price']
+        .astype(str)
+        .str.replace(',', '', regex=False)
+        .str.extract(r'(\d+\.?\d*)')[0]
+        .fillna(0)
+        .astype(float)
+    )
+
+    df_db['quantity'] = 0
+    df_db['final_amount'] = 0.0
     df_db['last_updated_at'] = datetime.datetime.now()
-    
+
+    # Deduplicate
+    df_db = df_db.drop_duplicates(subset=['product_code'], keep='last')
+
     conn = sqlite3.connect(DB_FILE)
-    
     try:
         df_db.to_sql('master_data', conn, if_exists='append', index=False)
-        print(f"Successfully migrated {len(df_db)} records to SQLite.")
-    except Exception as e:
-        print(f"Migration failed: {e}")
+        print(f"Successfully migrated {len(df_db)} records.")
     finally:
         conn.close()
 
